@@ -1,0 +1,5 @@
+#!/bin/bash
+
+echo Patching $1
+NOW=`date +%s`
+kubectl patch deployments/$1 -p '{"spec":{"template":{"spec":{"containers":[{"name":"'$1'","env":[{"name":"RESTART_","value":"'$NOW'"}]}]}}}}'

@@ -1,0 +1,23 @@
+#!/bin/bash
+
+SERVICE_NAME=$1
+ENV=$2
+SLACK_ICON=$3
+
+if [ ! $SLACK_ICON ]; then
+  SLACK_ICON=:ghost:
+fi
+
+if [ $NOTIFY_SLACK ]; then
+    if [ "$ENV" = "staging" ]; then
+        echo "Notifying #staging-releases with: '$SERVICE_NAME' is on its way to kube across all regions"
+        curl -X POST --data-urlencode 'payload={"channel": "#staging-releases", "username": "Sir Kubealot", "text": "'$SERVICE_NAME' is on its way to kube across all regions", "icon_emoji": "$SLACK_ICON"}' https://hooks.slack.com/services/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
+    elif [ "$ENV" = "production" ]; then
+        echo "Notifying #staging-releases with: '$SERVICE_NAME' is currently being updated across all regions. Patch notes to follow."
+        curl -X POST --data-urlencode 'payload={"channel": "#product-releases", "username": "Sir Kubealot", "text": "'$SERVICE_NAME' is currently being updated across all regions. Patch notes to follow.", "icon_emoji": "$SLACK_ICON"}' https://hooks.slack.com/services/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
+    else
+        echo "Not notifying slack as $ENV is not a recognised environment"
+    fi
+else
+    echo "Not notifying slack as NOTIFY_SLACK variable is not set..."
+fi

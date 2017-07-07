@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -e
+
+# We have to do some directory juggling here to make sure the relative paths are correct
+WORKINGDIRECTORY=$(pwd)
+cd "${BASH_SOURCE%/*}"
+
+../check-and-download/helm
+helm init --upgrade
+
+cd $WORKINGDIRECTORY

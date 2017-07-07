@@ -1,0 +1,33 @@
+#!/bin/bash
+
+set -e
+
+SHA1=$1
+APP_ENV=$2
+SERVICE_NAME=$3
+REGION=$4
+# Optional - e.g. :ghost:
+SLACK_EMOJI=$5
+
+for i in "$@" ; do
+    if [[ "$i" == "--dry-run" ]]; then
+        DRY_RUN="--dry-run"
+        echo "***DRY RUN***!"
+    fi
+done
+
+
+# Switch environment to this region
+source ./kube-stack/switch-kube-environment $APP_ENV/$REGION
+
+# Deploy to docker
+./kube-stack/deploy/deploy-docker $SHA1 $APP_ENV $SERVICE_NAME
+
+# Tell everyone what we're doing
+./kube-stack/deploy/notify-slack $SERVICE_NAME $APP_ENV $SLACK_EMOJI
+
+YAML_FILE=$(./kube-stack/deploy/get-deploy-yaml $APP_ENV)
+echo "Using $YAML_FILE for deployment"
+
+# Deploy the updated service definition to selected region
+./kube-stack/deploy/deploy-to-kube $YAML_FILE $APP_ENV $REGION $SERVICE_NAME $DRY_RUN

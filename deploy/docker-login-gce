@@ -1,0 +1,10 @@
+#!/bin/bash
+
+set -e 
+
+APP_SERVICE=$1
+
+GCE_PROJECT=$(gcloud config get-value project 2> /dev/null)
+export DOCKER_REGISTRY_HOST=gcr.io/$GCE_PROJECT
+
+docker login -e backend@velocityapp.com -u _json_key -p "$(cat $GOOGLE_APPLICATION_CREDENTIALS)" https://gcr.io

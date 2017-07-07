@@ -1,0 +1,11 @@
+#!/bin/bash
+
+if grep -q "$KUBE_VERSION" "./kubernetes/version"; then
+    echo $KUBE_VERSION is already installed
+else
+    echo Downloading $KUBE_VERSION
+    rm -rf kubernetes
+    rm -rf kubernetes.tar.gz*
+    curl -O https://github.com/kubernetes/kubernetes/releases/download/$KUBE_VERSION/kubernetes.tar.gz
+    tar -zxf kubernetes.tar.gz
+fi

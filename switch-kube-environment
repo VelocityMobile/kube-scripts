@@ -1,0 +1,75 @@
+#!/bin/bash
+# Usage: ./switch-kube-environment {folder name}
+# Example: ./switch-kube-environment staging/eu-west-1
+
+set -e
+
+YELLOW='\033[0;93m'
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+KUBE_ENV=$1
+
+WORKINGDIRECTORY=$(pwd)
+cd "${BASH_SOURCE%/*}"
+
+./check-and-download/realpath
+CONFIG_PATH=$(realpath $1)
+
+if [ -d "$KUBE_ENV" ]
+then
+  echo "Switching to the $KUBE_ENV kube environment.."
+
+  # Clean out old configs
+  mkdir -p ~/.kube
+  rm -f ~/.kube/config
+
+  KUBE_VERSION=$(cat "$CONFIG_PATH/kube-version.txt")
+  ./check-and-download/kubectl $KUBE_VERSION
+  
+  export CLUSTERTYPE=$(cat "$CONFIG_PATH/clustertype.txt")
+  if [ "$CLUSTERTYPE" == "gce" ]; then
+    echo -e "${GREEN}⛈  Detected a GCE environment${NC}"
+
+    if ! type "gcloud" > /dev/null; then
+      echo -e "${RED}😿  Cannot find the GCloud SDK. Please run sudo -E \"PATH=$PATH\" ./download-dependencies gce ❗${NC}"
+      exit 1
+    fi
+
+    source ./iam/set-gce-credentials $CONFIG_PATH
+
+    # Detect whether the script is being 'sourced'... If not, warn the user and output the correct command to set GOOGLE_APPLICATION_CREDENTIALS
+    if ! [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+      echo -e "${YELLOW}To save time, you can run this script as 'source ./switch-kube-environment <xxx>' and it can set GOOGLE_APPLICATION_CREDENTIALS for you.${NC}"
+      echo -e "${YELLOW}Because you didn't, you need to run the following command or kubectl won't work...${NC}"
+      echo "export GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS}"
+    fi
+
+    # Make a note of what kind of cluster we are.
+    echo gce > ~/.kube/clustertype.txt
+
+  elif [ "$CLUSTERTYPE" == "aws" ]; then
+    echo -e "${GREEN}💸 💸 💸  Detected an AWS environment${NC}"
+    
+    # Install awscli
+    if ! type "aws" > /dev/null; then
+      echo -e "${RED}😿  Cannot find the AWS CLI. Please run sudo -E \"PATH=$PATH\" ./download-dependencies aws ❗${NC}"
+      exit 1
+    fi
+
+    source ./iam/set-aws-credentials $KUBE_ENV
+    # Make a note of what kind of cluster we are.
+    echo aws > ~/.kube/clustertype.txt
+  else
+    echo -e "${RED}Environment '$KUBE_ENV' exists, but it is missing a valid clustertype.txt! Expected either aws or gce!${NC}"
+    exit 1
+  fi
+  
+  echo "Done!🔧"
+else
+  echo -e "${RED}Environment '$KUBE_ENV' does not exist! A valid example is 'production/eu-west-1'${NC}"
+  exit 1
+fi
+
+cd $WORKINGDIRECTORY

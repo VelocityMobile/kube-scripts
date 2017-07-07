@@ -1,0 +1,15 @@
+#!/bin/bash
+
+KUBE_URL=$(kubectl cluster-info | grep kubernetes-dashboard | sed 's/.*\ is\ running\ at.*https:\/\///g' | sed 's/dashboard.*$/dashboard/g')
+KUBE_USERNAME=$(grep username ~/.kube/config | sed 's/.*username:[[:space:]]*//g')
+KUBE_PASSWORD=$(grep password ~/.kube/config | sed 's/.*password:[[:space:]]*//g')
+
+DASHBOARD_URL="https://$KUBE_USERNAME:$KUBE_PASSWORD@$KUBE_URL"
+echo Dashboard URL: $DASHBOARD_URL
+
+OS=`uname`
+if [[ "$OS" == 'Linux' ]]; then
+  xdg-open $DASHBOARD_URL
+elif [[ "$OS" == 'Darwin' ]]; then
+  open $DASHBOARD_URL
+fi

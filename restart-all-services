@@ -1,0 +1,3 @@
+#!/bin/bash
+
+kubectl get deployments --no-headers | cut -d " " -f1 | xargs -I % -L1 sh -c '{ ./restart-service %; sleep 1; }'

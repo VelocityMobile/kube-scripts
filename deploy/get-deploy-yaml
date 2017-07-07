@@ -1,0 +1,22 @@
+#!/bin/bash
+
+set -e
+
+YELLOW='\033[0;93m'
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+# This script works out what YAML file to use, returns it in stdout
+APP_ENV=$1
+
+if [ "$CLUSTERTYPE" == "gce" ]; then
+    echo ./deploy/stack-$APP_ENV-gce.yaml
+elif [ "$CLUSTERTYPE" == "aws" ]; then
+    if [ -f ./deploy/stack-$APP_ENV-all-regions.yaml ]; then
+        # Support for older projects
+        echo ./deploy/stack-$APP_ENV-all-regions.yaml
+    else
+        echo ./deploy/stack-$APP_ENV-aws.yaml
+    fi
+fi

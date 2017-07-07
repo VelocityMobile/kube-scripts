@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# Run away screaming if anything fails
+set -e
+
+YAMLFILE=$1
+ENV=$2
+REGION=$3
+APP_SERVICE=$4
+DRY_RUN=$5
+
+echo "Switching Kubernetes region to $ENV/$REGION"
+# We have to do some directory juggling here to make sure the relative paths are correct
+WORKINGDIRECTORY2=$(pwd)
+cd "${BASH_SOURCE%/*}"
+
+source ../switch-kube-environment $ENV/$REGION
+CLUSTER_NAME=`cat ../$ENV/$REGION/clustername.txt`
+
+cd $WORKINGDIRECTORY2
+
+echo "Deploying $APP_SERVICE to $ENV in $REGION with $YAMLFILE"
+
+# We manipulate the YAML file before it gets applied, because kubernetes has no native way to substitute our CLUSTER_NAME variable.
+echo "Manipulating the YAML file to allow CLUSTER_NAME env vars"
+sed 's/\$(CLUSTER_NAME)/'$CLUSTER_NAME'/g' $YAMLFILE > yaml-to-apply.yaml
+echo "Final YAML file looks like:"
+cat yaml-to-apply.yaml
+echo
+
+if [ "$DRY_RUN" == "--dry-run" ]; then
+    echo "DRY RUN: YAML file will be validated but not applied."
+    kubectl apply -f yaml-to-apply.yaml --validate --dry-run
+else
+    echo "Applying YAML file"
+    kubectl apply -f yaml-to-apply.yaml --validate
+    echo "Restarting the service deployments/$APP_SERVICE"
+    kubectl patch deployments/$APP_SERVICE -p '{"spec":{"template":{"spec":{"containers":[{"name":"'$APP_SERVICE'","env":[{"name":"RESTART_","value":"'$(date +%s)'"}]}]}}}}'
+fi
+
+echo "Cleaning temporary YAML file"
+rm yaml-to-apply.yaml

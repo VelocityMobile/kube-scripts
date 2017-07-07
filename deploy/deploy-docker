@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# Run away screaming if anything fails. 
+# This script assumes you're already switched to an AWS environment so have all the access keys etc.
+set -e
+
+SHA1=$1
+ENV=$2
+APP_SERVICE=$3
+
+YELLOW='\033[0;93m'
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+echo -e "${YELLOW}🔑  Logging into Docker to deploy ${APP_SERVICE}"
+
+# We have to do some directory juggling here to make sure the relative paths are correct
+WORKINGDIRECTORY=$(pwd)
+cd "${BASH_SOURCE%/*}"
+
+if [ "$CLUSTERTYPE" == "gce" ]; then
+    echo -e "${GREEN}⛈  Detected a GCE environment${NC}"
+    source ./docker-login-gce $APP_SERVICE
+elif [ "$CLUSTERTYPE" == "aws" ]; then
+    echo -e "${GREEN}💸 💸 💸  Detected an AWS environment${NC}"
+    source ./docker-login-aws $APP_SERVICE
+fi
+
+cd $WORKINGDIRECTORY
+
+echo "Deploying $APP_SERVICE docker container $SHA1 ($ENV) to $DOCKER_REGISTRY_HOST"
+
+# This script expects you to have already built your image using e.g. docker build -t $APP_SERVICE .
+docker tag $APP_SERVICE:latest $DOCKER_REGISTRY_HOST/$APP_SERVICE:$ENV
+docker tag $APP_SERVICE:latest $DOCKER_REGISTRY_HOST/$APP_SERVICE:$SHA1
+docker push $DOCKER_REGISTRY_HOST/$APP_SERVICE:$ENV
+docker push $DOCKER_REGISTRY_HOST/$APP_SERVICE:$SHA1

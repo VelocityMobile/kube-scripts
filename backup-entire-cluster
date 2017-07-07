@@ -1,0 +1,37 @@
+#!/bin/bash
+
+set -e
+
+echo Getting master IP...
+
+if ! type "gsed" > /dev/null; then
+    brew install gnu-sed
+fi
+
+export KUBE_MASTER=$(kubectl cluster-info | grep master | sed 's/.*\ is\ running\ at.*https:\/\///g' | gsed -r 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g'	)
+echo Master IP is $KUBE_MASTER
+
+echo Running the backup on the master at $KUBE_MASTER...
+ssh -i ~/.ssh/kube_aws_rsa admin@$KUBE_MASTER 'bash -s' < backup-on-master.sh
+
+mkdir -p backups/
+
+echo Copying the backup from $KUBE_MASTER...
+scp -i ~/.ssh/kube_aws_rsa admin@$KUBE_MASTER:daemonsets-cluster-specific.yaml backups/
+scp -i ~/.ssh/kube_aws_rsa admin@$KUBE_MASTER:configmaps-cluster-specific.yaml backups/
+scp -i ~/.ssh/kube_aws_rsa admin@$KUBE_MASTER:services-cluster-specific.yaml backups/
+scp -i ~/.ssh/kube_aws_rsa admin@$KUBE_MASTER:deployments-cluster-specific.yaml backups/
+scp -i ~/.ssh/kube_aws_rsa admin@$KUBE_MASTER:secrets-cluster-specific.yaml backups/
+
+function clean-rubbish {
+    gsed -E '/\b(creationTimestamp|resourceVersion|clusterIP|terminationMessagePath|uid|selfLink|currentNumberScheduled|numberMisscheduled|desiredNumberScheduled|status|availableReplicas|observedGeneration|ingress|updatedReplicas|loadBalancer|deployment.kubernetes.io.*?):/d' backups/$1-cluster-specific.yaml > backups/$1.yaml
+    gsed -i '$ d' backups/$1.yaml
+    echo Created backups/$1.yaml
+}
+
+echo Cleaning cluster-specific rubbish from the backups...
+clean-rubbish daemonsets
+clean-rubbish configmaps
+clean-rubbish services
+clean-rubbish deployments
+clean-rubbish secrets

@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e 
+
+# Validate project's YAML files 
+pip install pyyaml --upgrade --user --quiet
+for yml in $(find "." -name "*.yaml"); do
+  echo "$yml"
+  python -c "import yaml; yaml.load_all( open('$yml','r'))"
+  if [ "$?" != "0" ]; then
+    echo "===> [$yml] check has failed!"
+  fi
+done

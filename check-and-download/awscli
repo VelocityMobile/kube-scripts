@@ -1,0 +1,8 @@
+#!/bin/bash
+
+set -e
+
+if ! type "aws" > /dev/null; then
+    # This is simple... just install using pip
+    pip install awscli --upgrade --quiet --ignore-installed six
+fi

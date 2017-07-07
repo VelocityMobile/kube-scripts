@@ -1,0 +1,55 @@
+#!/bin/bash
+
+set -e
+
+GREEN='\033[0;32m'
+YELLOW='\033[0;93m'
+NC='\033[0m'
+
+KUBE_VERSION=$1
+
+# Backwards-compatibility with old CI scripts that download kubectl themselves
+if [ -f ./kubectl ] && [ "$KUBE_VERSION" == "v1.3.4" ]; then
+    echo -e "${GREEN}🔧  Skipping Kubectl v1.3.4 installation because I detected you already downloaded it! (CIRCLECI)!${NC}"
+    exit 0
+fi
+
+# If no version specified, assume you want the latest...
+if [ "$KUBE_VERSION" == "" ] || [ "$KUBE_VERSION" == "stable" ]; then
+    echo -e "${YELLOW}Asking teh googles what the latest stable version is...${NC}"
+    KUBE_VERSION=$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)
+fi
+
+# We store versions of kubectl in /usr/local/bin and then link /usr/local/bin/kubectl to the right one.
+DOWNLOAD_KUBE="N"
+TARGET_FILENAME=/usr/local/bin/kubectl-$KUBE_VERSION
+
+# OS Detection
+if [ "$(uname)" == "Darwin" ]; then
+    KUBE_OS="darwin"
+else
+    KUBE_OS="linux"
+fi
+
+if ! [ -f $TARGET_FILENAME ]; then
+    echo -e "🔎  ${YELLOW}Couldn't find ${TARGET_FILENAME}...${NC}"
+    DOWNLOAD_KUBE="Y"
+fi
+
+if [ "$DOWNLOAD_KUBE" == "Y" ]; then
+    echo -e "${YELLOW}👾  Downloading Kubectl ${KUBE_VERSION} for ${KUBE_OS}...${NC}"
+    curl -LO https://storage.googleapis.com/kubernetes-release/release/$KUBE_VERSION/bin/${KUBE_OS}/amd64/kubectl
+
+    echo -e "${YELLOW}Now I need might need sudo to copy kubectl to ${TARGET_FILENAME}...${NC}"
+    # The first time, /usr/local/bin is not writable without sudo
+    sudo mv ./kubectl $TARGET_FILENAME
+    sudo chmod 777 /usr/local/bin
+    sudo chmod 777 /usr/local/bin/kubectl*
+else
+    echo -e "${GREEN}🙌  Skipping kube download... you already have ${KUBE_VERSION}!${NC}"
+fi
+
+# Copy kubectl to somewhere on our path, and store it for later so we don't download every time.
+rm -f /usr/local/bin/kubectl
+ln /usr/local/bin/kubectl-$KUBE_VERSION /usr/local/bin/kubectl
+echo -e "${GREEN}🔧  Kubectl ${KUBE_VERSION} is now active!${NC}"

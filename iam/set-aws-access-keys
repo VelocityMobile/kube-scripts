@@ -1,0 +1,11 @@
+#!/bin/bash
+
+set -e 
+
+# Run this in your script using `source iam/set-aws-access-key`
+# This script is used to bootstrap AWS when we are creating kube environments. GCE doesn't need this because they have a GUI!
+
+echo 'Change the access keys in iam/set-aws-access-keys before running this script...'
+exit 1
+export AWS_ACCESS_KEY_ID="CHANGE_ME"
+export AWS_SECRET_ACCESS_KEY="CHANGE_ME"

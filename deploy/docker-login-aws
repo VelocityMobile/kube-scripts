@@ -1,0 +1,12 @@
+#!/bin/bash 
+
+set -e
+
+APP_SERVICE=$1
+
+# Log in using AWS credentials - currently all images are stored in eu-west-1
+echo "Logging into AWS ECR..."
+`aws ecr get-login --region eu-west-1`
+
+echo "Creating the ECR repository if needed..."
+aws ecr create-repository --repository-name $APP_SERVICE --region=eu-west-1 || true

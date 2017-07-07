@@ -1,0 +1,49 @@
+#!/bin/bash
+
+set -e
+
+YELLOW='\033[0;93m'
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+INSTALL_GCLOUD=""
+if ! type "gcloud" > /dev/null; then
+    INSTALL_GCLOUD="Y"
+elif [ -n "$CIRCLECI" ] && ! [ -f ~/.gcloud_installed ]; then 
+    INSTALL_GCLOUD="Y"
+fi
+
+# If the gcloud tool isn't installed, you need it
+if [ -n "$INSTALL_GCLOUD" ]; then
+    echo -e "${YELLOW}☁️  Installing gcloud SDK tools${NC}"
+
+    if type "apt-get" > /dev/null; then
+        pyenv global 2.7.12
+        export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)"
+        echo "deb https://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+        curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+        
+        # If on Ubuntu trusty, fix the mysql key
+        # See https://askubuntu.com/questions/884798/why-mysql-repository-key-suddenly-expired
+        if type "lsb_release" > /dev/null; then
+            if [[ "$(lsb_release -r)" == *"14.04" ]]; then
+                sudo apt-key adv --keyserver pgp.mit.edu --recv-keys A4A9406876FCBD3C456770C88C718D3B5072E1F5
+            fi
+        fi
+
+        sudo -E apt-get -qq update && sudo -E apt-get -qq install google-cloud-sdk
+        touch ~/.gcloud_installed
+    else
+        curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-159.0.1-darwin-x86_64.tar.gz
+        tar -zxf google-cloud-sdk-159.0.1-darwin-x86_64.tar.gz -C ~/
+        ~/google-cloud-sdk/install.sh --quiet
+        # The next line updates PATH for the Google Cloud SDK.
+        if [ -f '~/google-cloud-sdk/path.bash.inc' ]; then source '~/google-cloud-sdk/path.bash.inc'; fi
+        # The next line enables shell command completion for gcloud.
+        if [ -f '~/google-cloud-sdk/completion.bash.inc' ]; then source '~/google-cloud-sdk/completion.bash.inc'; fi
+        # Then trigger an update, because 148.0.1 isn't going to stay the current for long...
+        gcloud components update --quiet
+        gcloud components install docker-credential-gcr --quiet
+    fi
+fi

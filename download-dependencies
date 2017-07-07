@@ -1,0 +1,43 @@
+#!/bin/bash
+
+set -e
+
+# We have to do some directory juggling here to make sure the relative paths are correct
+WORKINGDIRECTORY=$(pwd)
+cd "${BASH_SOURCE%/*}"
+
+# These tools are always needed
+echo "Checking/Installing Common dependencies..."
+sudo -E "PATH=$PATH" ./check-and-download/realpath
+sudo -E "PATH=$PATH" ./check-and-download/pip
+sudo -E "PATH=$PATH" ./check-and-download/shyaml
+echo ""
+
+# Use this script if you want to be able to run other commands without sudo
+for ARG in "$@"
+do
+    # Dependent on the stack used
+    case $ARG in
+        gce)
+            echo "Checking/Installing GCE dependencies..."
+            sudo -E "PATH=$PATH" ./check-and-download/kubectl stable
+            sudo -E "PATH=$PATH" ./check-and-download/gcloud
+            echo ""
+            ;;
+    
+        aws)
+            echo "Checking/Installing AWS dependencies..."
+            sudo -E "PATH=$PATH" ./check-and-download/kubectl v1.3.4
+            sudo -E "PATH=$PATH" ./check-and-download/awscli
+            echo ""
+            ;;
+
+        helm)
+            echo "Checking/Installing Helm dependencies..."
+            sudo -E "PATH=$PATH" ./check-and-download/helm
+            echo ""
+            ;;
+    esac
+done
+
+cd $WORKINGDIRECTORY

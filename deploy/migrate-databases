@@ -1,0 +1,48 @@
+#!/bin/bash
+
+set -e
+
+GREEN='\033[0;32m'
+YELLOW='\033[0;93m'
+RED='\033[0;31m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+if [ "$1" = "" ]; then
+    echo -e This script switches kube environments and updates any databases you provide by setting the DATABASE_URL env variable. 
+    echo -e It reads the config directly from kube configmaps and aborts on first failure.
+    echo -e ${GREEN}'Usage: migrate-databases <configmap name> <key name> <npm run commmand> <environments> ...'${NC}
+    echo -e EG: ./deploy/migrate-databases ${RED}devices ${GREEN}database-url ${CYAN}migrations:up ${YELLOW}staging/us-east-1 staging/eu-west-1${NC}
+    exit 1
+fi
+
+CONFIG_MAP=$1
+KEY_NAME=$2
+MIGRATION_NPM_COMMAND=$3
+KUBE_ENVS=${@:4}
+
+WORKINGDIRECTORY=$(pwd)
+
+function migrateDatabases () {
+    KUBE_ENV=$1
+    echo Running migrations for $KUBE_ENV ⛵️...
+
+    # We have to do some directory juggling here to make sure the relative paths are correct
+    cd "${BASH_SOURCE%/*}"
+
+    ../switch-kube-environment $KUBE_ENV
+    ../check-and-download/shyaml
+
+    cd $WORKINGDIRECTORY
+
+    export DATABASE_URL=$(kubectl get configmaps $CONFIG_MAP -o yaml | shyaml get-value data.$KEY_NAME)
+    export DATABASE_URL_SANITISED=$(echo $DATABASE_URL | sed 's/\(.*:\/\/.*:\).*\(@.*\)/\1********\2/')
+
+    echo Database URL is $DATABASE_URL_SANITISED
+    npm run $MIGRATION_NPM_COMMAND
+}
+
+for k in $KUBE_ENVS
+do
+    migrateDatabases $k
+done

@@ -1,0 +1,109 @@
+#!/bin/bash
+
+# TODO: run these scripts in every branch build (via circle.yml), with a --dry-run parameter 
+# when kubernetes supports it (http://kubernetes.io/docs/user-guide/kubectl/kubectl_apply/)
+
+# Abandon ship if anything fails
+set -e
+
+ENV=$1
+REGION=$2
+
+if [ -z "$ENV" ] || [ -z "$REGION" ]; then
+    echo "Calling convention: apply-kube-configs staging us-east-1 [--dry-run]"
+    exit 1
+fi
+
+for i in "$@" ; do
+    if [[ "$i" == "--dry-run" ]]; then
+        DRY_RUN="--dry-run"
+        echo "***DRY RUN***!"
+    fi
+done
+
+# We have to do some directory juggling here to make sure the relative paths are correct
+WORKINGDIRECTORY=$(pwd)
+cd "${BASH_SOURCE%/*}"
+
+cd ..
+
+echo "Switching kube environment to $ENV/$REGION 🏄"
+source ./switch-kube-environment $ENV/$REGION
+echo
+
+# Keep tiller up to date on this cluster
+if [ ! -z "$DRY_RUN" ] || [ "$CLUSTERTYPE" == "gce" ]; then
+    echo "Skipping tiller (helm)..."
+else
+    echo "Installing tiller (helm) on $ENV/$REGION 🦄"
+    ./cluster-management/install-helm-on-cluster
+fi
+echo
+
+if [ -e $ENV/commonConfigMap.yaml ]; then
+    echo "Applying the common configMaps for $ENV to $REGION 👮‍️"
+    kubectl apply -f $ENV/commonConfigMap.yaml --validate $DRY_RUN
+else
+    echo "No common config to apply for $ENV..."
+fi
+echo
+
+if [ -e $ENV/commonSecrets.yaml ]; then
+    echo "Applying the regional configMaps for $ENV/$REGION 🌃"
+    kubectl apply -f $ENV/$REGION/configMap.yaml --validate $DRY_RUN
+else
+    echo "No regional config to apply for $ENV/$REGION..."
+fi
+echo
+
+if [ -e $ENV/commonSecrets.yaml ]; then
+    echo "Applying the common secrets for $ENV to $REGION 🗝"
+    kubectl apply -f $ENV/commonSecrets.yaml --validate $DRY_RUN
+else
+    echo "No common secrets to apply for $ENV..."
+fi
+echo
+
+# Running any custom helm scripts
+if [ ! -z "$DRY_RUN" ]; then
+    echo "Skipping helm scripts..."
+else
+    if [ -e $ENV/$REGION/helm.sh ]; then
+        echo "Applying the region-specific helm scripts for $ENV to $REGION 🗝"
+        ./$ENV/$REGION/helm.sh
+    else
+        echo "No region-specific helm scripts to apply..."
+    fi
+fi
+echo
+
+if [ -e $ENV/$REGION/secrets.yaml ]; then
+    echo "Applying the region-specific secrets for $ENV to $REGION 🗝"
+    kubectl apply -f $ENV/$REGION/secrets.yaml --validate $DRY_RUN
+else
+    echo "No region-specific secrets to apply..."
+fi
+echo
+
+if [ -e $ENV/$REGION/ingress.yaml ]; then
+    echo "Applying the region-specific ingress for $ENV to $REGION 🗝"
+    kubectl apply -f $ENV/$REGION/ingress.yaml --validate $DRY_RUN
+else
+    echo "No region-specific ingress to apply..."
+fi
+echo
+
+if [ -e $ENV/$REGION/default-limits.yaml ]; then
+    echo "Applying the region-specific default limits for $ENV to $REGION 🗝"
+    kubectl apply -f $ENV/$REGION/default-limits.yaml --validate $DRY_RUN
+else
+    echo "No region-specific default limits to apply..."
+fi
+echo
+
+# So we don't eat all the disk space with old images!
+echo "Applying the docker-cleanup daemon set 🛀"
+kubectl apply -f $ENV/docker-cleanup-daemonset.yml --validate $DRY_RUN
+echo
+
+cd $WORKINGDIRECTORY
